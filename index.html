@@ -208,7 +208,7 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
     <div class="row" style="margin-bottom:12px"><button class="btn ghost small" id="iv-back" type="button">&larr; Daftar invoice</button></div>
     <div class="card"><h2>Data invoice</h2>
       <div class="field"><label for="i-nomor">Nomor invoice</label><input id="i-nomor" autocomplete="off"></div>
-      <p class="hint">Isi manual, misalnya INV/MM/001/XI/2026.</p>
+      <p class="hint">Terisi otomatis berurutan per bulan (contoh INV/MM/001/XI/2026). Bisa diubah bila perlu.</p>
       <div class="grid2"><div class="field"><label for="i-tanggal">Tanggal</label><input id="i-tanggal" type="date"></div><div class="field"><label for="i-tempo">Jatuh tempo</label><input id="i-tempo" type="date"></div></div>
       <div class="grid2"><div class="field"><label for="i-ref">No. penawaran (referensi)</label><input id="i-ref" autocomplete="off"></div><div class="field"><label for="i-status">Status</label><select id="i-status"><option>Belum Dibayar</option><option>Lunas</option></select></div></div>
     </div>
@@ -1009,14 +1009,24 @@ function fitInv(){
 window.addEventListener("resize",fitInv);
 var iWaDirty=false,iMailDirty=false;
 const ISYNC=[["i-nomor","nomor"],["i-tanggal","tanggal"],["i-tempo","tempo"],["i-ref","ref"],["i-klien","klien"],["i-pic","pic"],["i-wa","wa"],["i-email","email"],["i-alamat","alamat"],["i-proyek","proyek"],["i-jenis","jenis"],["i-nilai","nilai"],["i-pct","pct"],["i-bayar","bayar"],["i-uraian","uraian"],["i-catatan","catatan"],["i-status","status"]];
+function autoInvNomor(){
+  const d=new Date(inv.tanggal+"T00:00:00"), rom=ROMAN[d.getMonth()], yr=d.getFullYear();
+  let mx=0; INVHIST.forEach(h=>{const m=String(h.nomor).match(/^INV\/MM\/(\d+)\/([IVX]+)\/(\d{4})$/); if(m&&m[2]===rom&&+m[3]===yr) mx=Math.max(mx,+m[1])});
+  return "INV/MM/"+String(mx+1).padStart(3,"0")+"/"+rom+"/"+yr;
+}
 function isyncInputs(){
   ISYNC.forEach(([id,k])=>{$(id).value=inv[k]});
   iWaDirty=false;iMailDirty=false; renderInv(); invSaveInfo();
+  if(!inv.id&&!inv.nomorManual&&API_ON) refreshInv().then(()=>{
+    if(!inv.id&&!inv.nomorManual){inv.nomor=autoInvNomor();$("i-nomor").value=inv.nomor;renderInv()}
+  });
 }
 ISYNC.forEach(([id,k])=>{
   $(id).addEventListener("input",()=>{
     inv[k]=$(id).value;
     if(k==="uraian") inv.uraianManual=true;
+    if(k==="nomor") inv.nomorManual=true;
+    if(k==="tanggal"&&!inv.id&&!inv.nomorManual){inv.nomor=autoInvNomor();$("i-nomor").value=inv.nomor}
     if(k==="tanggal"&&!inv._tempoTouched) {inv.tempo=addDays(inv.tanggal,7);$("i-tempo").value=inv.tempo}
     if(k==="tempo") inv._tempoTouched=true;
     renderInv();
@@ -1206,7 +1216,7 @@ $("iv-list").addEventListener("click",async e=>{
   inv=newInvState(r.data); inv.id=id; inv._tempoTouched=true;
   if(l){
     const jml=(INVHIST.find(x=>x.id===id)||{}).jumlah||0;
-    inv=newInvState(Object.assign({},r.data,{jenis:INV_JENIS[1],bayar:String(Math.round(num(inv.jenis===INV_JENIS[1]?(+inv.bayar||0)+(+jml||0):jml))),nomor:"INV/MM/",tanggal:todayStr(),tempo:addDays(todayStr(),7),status:"Belum Dibayar",uraianManual:false}));
+    inv=newInvState(Object.assign({},r.data,{jenis:INV_JENIS[1],bayar:String(Math.round(num(inv.jenis===INV_JENIS[1]?(+inv.bayar||0)+(+jml||0):jml))),nomor:"INV/MM/",tanggal:todayStr(),tempo:addDays(todayStr(),7),status:"Belum Dibayar",uraianManual:false,nomorManual:false}));
     inv.id=null;
     say("Pelunasan disiapkan. Isi nomor invoice, lalu simpan.",5000);
   }
