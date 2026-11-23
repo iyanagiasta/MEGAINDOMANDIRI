@@ -210,6 +210,7 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
       <div class="field"><label for="pic">Untuk perhatian</label><input id="pic" autocomplete="off"></div>
       <div class="field"><label for="wa">Nomor WhatsApp</label><input id="wa" inputmode="tel" autocomplete="off"></div>
     </div>
+    <div class="field"><label for="email">Email klien</label><input id="email" type="email" inputmode="email" autocomplete="off" placeholder="nama@perusahaan.com"></div>
     <div class="field"><label for="alamat">Alamat klien</label><input id="alamat" autocomplete="off"></div>
     <div class="field"><label for="proyek">Perihal / lokasi pekerjaan</label><input id="proyek" autocomplete="off"></div>
   </div>
@@ -278,9 +279,10 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
     <h2>Pesan Email</h2>
     <div class="field"><label for="mail-subj">Subjek</label><input id="mail-subj"></div>
     <div class="field"><label for="mail-text">Isi email</label><textarea id="mail-text" aria-label="Isi email"></textarea></div>
+    <label class="check" id="cc-wrap" hidden><input type="checkbox" id="mail-cc" checked> Kirim salinan ke email saya</label>
+    <div class="row"><button class="btn primary" id="btn-send" type="button" hidden>Kirim email (PDF terlampir)</button><button class="btn navy" id="btn-mailto" type="button">Buka aplikasi email</button></div>
     <div class="row"><button class="btn ghost small" id="btn-copy-subj" type="button">Salin subjek</button><button class="btn ghost small" id="btn-copy-mail" type="button">Salin isi email</button></div>
-    <p class="hint">Tempel ke email Anda, lalu lampirkan PDF yang sudah diunduh.</p>
-    <div class="note">Konsep: kirim email langsung dengan tautan unduhan, riwayat penawaran, dan daftar klien tersimpan akan ada di versi aplikasi penuh. Prototipe ini belum menyimpan data.</div>
+    <p class="hint" id="mail-hint">Isi alamat email klien di bagian Klien. Aplikasi email akan terbuka dengan subjek dan isi terisi, lalu lampirkan PDF yang sudah diunduh.</p>
   </div>
 </section>
 </div>
@@ -311,7 +313,7 @@ const today=new Date();
 const st={
   tanggal:today.toISOString().slice(0,10),
   nomor:"",
-  klien:"PT Contoh Klien",pic:"Bapak/Ibu",wa:"",alamat:"Alamat klien",proyek:"Pekerjaan lantai gudang",
+  klien:"PT Contoh Klien",pic:"Bapak/Ibu",wa:"",email:"",alamat:"Alamat klien",proyek:"Pekerjaan lantai gudang",
   items:[{jenis:"Epoxy Lantai",uraian:JENIS["Epoxy Lantai"],skema:SKEMA[0],luas:"250",harga:"150000"}],
   discType:"rp",discVal:"0",ppnOn:false,ppnPct:"11",
   syarat:"Penawaran berlaku 14 hari sejak tanggal surat.\nPembayaran: uang muka 50% saat pekerjaan dimulai, pelunasan setelah pekerjaan selesai.\nGaransi pekerjaan 1 tahun.\nHarga di atas adalah harga borongan sesuai luas yang tertera.",
@@ -439,7 +441,7 @@ function bind(id,key,cb){
 }
 bind("tanggal","tanggal",()=>{if(!st.nomorManual){st.nomor=autoNomor();$("nomor").value=st.nomor}});
 bind("nomor","nomor",()=>{st.nomorManual=true});
-bind("klien","klien");bind("pic","pic");bind("wa","wa");bind("alamat","alamat");bind("proyek","proyek");
+bind("klien","klien");bind("email","email");bind("pic","pic");bind("wa","wa");bind("alamat","alamat");bind("proyek","proyek");
 bind("disc-type","discType");bind("disc-val","discVal");bind("ppn-pct","ppnPct");bind("syarat","syarat");
 bind("ttd-nama","ttdNama");bind("ttd-jabatan","ttdJabatan");
 $("lamp-profile").addEventListener("change",()=>{waDirty=false;mailDirty=false;update()});
@@ -644,30 +646,61 @@ function makePdf(){
   }
   return doc;
 }
+async function buildPdf(){
+  if(!window.jspdf) throw new Error("Pustaka PDF belum termuat. Coba lagi sebentar lagi.");
+  const doc=makePdf(); let blob=doc.output("blob"), merged=false, warn="";
+  if($("lamp-profile").checked){
+    try{
+      if(!window.PDFLib) throw new Error("pustaka");
+      const bin=atob(PROFILE_B64), bytes=new Uint8Array(bin.length); for(let k=0;k<bin.length;k++) bytes[k]=bin.charCodeAt(k);
+      const a=await PDFLib.PDFDocument.load(await blob.arrayBuffer());
+      const b=await PDFLib.PDFDocument.load(bytes);
+      (await a.copyPages(b,b.getPageIndices())).forEach(p=>a.addPage(p));
+      blob=new Blob([await a.save()],{type:"application/pdf"}); merged=true;
+    }catch(e){warn="company profile belum bisa digabung ("+(e&&e.message?e.message:"gagal")+")"}
+  }
+  return {blob,merged,warn,name:"Penawaran-"+st.nomor.replace(/[\/\\]/g,"-")+".pdf"};
+}
 $("btn-pdf").addEventListener("click",async()=>{
   try{
-    if(!window.jspdf){say("Pustaka PDF belum termuat. Coba lagi sebentar lagi.");return}
-    const doc=makePdf(); let blob=doc.output("blob"), note="PDF siap diunduh.";
-    if($("lamp-profile").checked){
-      try{
-        if(!window.PDFLib) throw new Error("pustaka");
-        const bin=atob(PROFILE_B64), bytes=new Uint8Array(bin.length); for(let k=0;k<bin.length;k++) bytes[k]=bin.charCodeAt(k);
-        const a=await PDFLib.PDFDocument.load(await blob.arrayBuffer());
-        const b=await PDFLib.PDFDocument.load(bytes);
-        (await a.copyPages(b,b.getPageIndices())).forEach(p=>a.addPage(p));
-        blob=new Blob([await a.save()],{type:"application/pdf"});
-        note="PDF siap diunduh, sudah termasuk company profile.";
-      }catch(e){note="PDF penawaran siap, tetapi company profile belum bisa digabung ("+(e&&e.message?e.message:"gagal")+").";}
-    }
-    const name="Penawaran-"+st.nomor.replace(/[\/\\]/g,"-")+".pdf";
+    const r=await buildPdf(), blob=r.blob, name=r.name;
     const dl=(typeof claude!=="undefined"&&claude.use)?await claude.use("downloads"):null;
     if(dl){await dl.save({filename:name,data:blob})}
     else{const u=URL.createObjectURL(blob),a2=document.createElement("a");a2.href=u;a2.download=name;document.body.appendChild(a2);a2.click();a2.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
-    say(note,6000);
+    say(r.warn?"PDF penawaran siap, tetapi "+r.warn+".":(r.merged?"PDF siap diunduh, sudah termasuk company profile.":"PDF siap diunduh."),6000);
   }catch(e){say("PDF belum bisa disimpan: "+(e&&e.message?e.message:"dibatalkan"))}
 });
 
 renderItems(); layout(); update();
+/* ---------- email ---------- */
+const emailOk=v=>/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(v).trim());
+$("btn-mailto").addEventListener("click",()=>{
+  const to=String(st.email||"").trim();
+  const q="subject="+encodeURIComponent($("mail-subj").value)+"&body="+encodeURIComponent($("mail-text").value);
+  location.href="mailto:"+(emailOk(to)?encodeURIComponent(to):"")+"?"+q;
+  say("Aplikasi email dibuka. Lampirkan PDF yang sudah diunduh.",5000);
+});
+let sendArm=null;
+$("btn-send").addEventListener("click",async()=>{
+  const btn=$("btn-send"), to=String(st.email||"").trim();
+  if(!emailOk(to)){say("Isi alamat email klien yang valid dulu.",4000);$("email").focus();return}
+  if(!sendArm){
+    btn.textContent="Yakin kirim ke "+to+"? Tekan lagi";
+    sendArm=setTimeout(()=>{sendArm=null;btn.textContent="Kirim email (PDF terlampir)"},6000); return;
+  }
+  clearTimeout(sendArm); sendArm=null; btn.disabled=true; btn.textContent="Mengirim...";
+  try{
+    const r=await buildPdf();
+    const b64=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(String(fr.result).split(",")[1]);fr.onerror=()=>no(new Error("PDF gagal dibaca"));fr.readAsDataURL(r.blob)});
+    const res=await api("sendMail",{to,subject:$("mail-subj").value,body:$("mail-text").value,filename:r.name,pdfBase64:b64,cc:$("mail-cc").checked});
+    if(!res.ok){ if(res.error==="auth"){logout();return} say("Email gagal terkirim: "+(res.error||"coba lagi"),7000); return }
+    if(res.demo) say("Mode contoh: email tidak benar-benar dikirim.",6000);
+    else say("Email terkirim ke "+to+(r.warn?" (tanpa company profile)":"")+".",6000);
+    if(st.id&&!res.demo){const sr=await api("setStatus",{id:st.id,status:"Terkirim"}); if(sr.ok){const h=HIST.find(x=>x.id===st.id); if(h)h.status="Terkirim"}}
+  }catch(e){say("Email gagal terkirim: "+(e&&e.message?e.message:"coba lagi"),7000)}
+  finally{btn.disabled=false;btn.textContent="Kirim email (PDF terlampir)"}
+});
+
 /* ---------- penyimpanan, login, riwayat ---------- */
 const API_URL="https://script.google.com/macros/s/AKfycbyOfOrW1lIQPuYpTg4YLDv_uSGKb1eiQbKzYee_NMCYmRjestmh8WL-EAgeR77jEazI/exec";
 const API_ON=!!API_URL;
@@ -693,6 +726,7 @@ async function api(action,payload){
       return {ok:true,id:row.id};
     }
     if(action==="setStatus"){const r=demoDB.find(x=>x.id===p.id);if(r)r.status=p.status;return {ok:true}}
+    if(action==="sendMail"){return {ok:true,demo:true}}
     if(action==="getProfile") return {ok:true,nama:demoProf.nama,jabatan:demoProf.jabatan,dataUrl:demoSig};
     if(action==="saveProfile"){demoProf={nama:p.nama,jabatan:p.jabatan};return {ok:true}}
     if(action==="getSig") return {ok:true,dataUrl:demoSig};
@@ -710,7 +744,7 @@ function savedPw(){try{return localStorage.getItem(KEY)||sessionStorage.getItem(
 function storePw(pw,keep){try{localStorage.removeItem(KEY);sessionStorage.removeItem(KEY);(keep?localStorage:sessionStorage).setItem(KEY,pw)}catch(e){}}
 function clearPw(){try{localStorage.removeItem(KEY);sessionStorage.removeItem(KEY)}catch(e){}}
 
-const SYNC=[["tanggal","tanggal"],["nomor","nomor"],["klien","klien"],["pic","pic"],["wa","wa"],["alamat","alamat"],["proyek","proyek"],["disc-type","discType"],["disc-val","discVal"],["ppn-pct","ppnPct"],["syarat","syarat"],["ttd-nama","ttdNama"],["ttd-jabatan","ttdJabatan"]];
+const SYNC=[["tanggal","tanggal"],["nomor","nomor"],["klien","klien"],["email","email"],["pic","pic"],["wa","wa"],["alamat","alamat"],["proyek","proyek"],["disc-type","discType"],["disc-val","discVal"],["ppn-pct","ppnPct"],["syarat","syarat"],["ttd-nama","ttdNama"],["ttd-jabatan","ttdJabatan"]];
 function syncInputs(){
   SYNC.forEach(([id,k])=>{$(id).value=st[k]});
   $("ppn-on").checked=!!st.ppnOn;
@@ -814,6 +848,8 @@ async function enter(pw,keep){
   showView("new"); saveInfo();
 }
 if(API_ON){
+  $("btn-send").hidden=false; $("cc-wrap").hidden=false;
+  $("mail-hint").textContent="Kirim email langsung dengan PDF terlampir, atau buka aplikasi email Anda dan lampirkan PDF sendiri.";
   $("login").hidden=false;
   $("login-eye").addEventListener("click",()=>{const p=$("login-pw"),sh=p.type==="password";p.type=sh?"text":"password";$("login-eye").textContent=sh?"Sembunyi":"Lihat"});
   $("login-form").addEventListener("submit",e=>{e.preventDefault();enter($("login-pw").value,$("login-keep").checked)});
