@@ -255,7 +255,7 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
       <input id="ttd-file" type="file" accept="image/*" style="display:none">
       <button class="btn danger small" id="ttd-clear" type="button">Hapus</button>
     </div>
-    <p class="hint">Foto tanda tangan di kertas putih. Latar putihnya dibersihkan otomatis. Tanda tangan ikut tertanam di PDF.</p>
+    <p class="hint">Foto tanda tangan di kertas putih. Latar putihnya dibersihkan otomatis. Nama, jabatan, dan tanda tangan tersimpan sekali, lalu terisi otomatis setiap login dan ikut tercetak di PDF.</p>
   </div>
 </section>
 
@@ -474,7 +474,7 @@ $("ttd-file").addEventListener("change",e=>{
   fr.onload=()=>{
     const img=new Image();
     img.onload=()=>{
-      const sc=Math.min(1,700/Math.max(img.width,img.height));
+      const sc=Math.min(1,500/Math.max(img.width,img.height));
       const cv=document.createElement("canvas"); cv.width=Math.round(img.width*sc); cv.height=Math.round(img.height*sc);
       const ctx=cv.getContext("2d"); ctx.drawImage(img,0,0,cv.width,cv.height);
       const d=ctx.getImageData(0,0,cv.width,cv.height), a=d.data;
@@ -676,7 +676,7 @@ const DEMO=API_URL==="demo";
 const demoDB=(()=>{const mk=(id,nomor,dasar,rev,tgl,klien,proyek,hrg,status)=>({id,nomor,dasar,rev,tanggal:tgl,klien,proyek,status,diubah:tgl,total:250*hrg,
   data:{tanggal:tgl,nomor,klien,pic:"Bapak/Ibu",wa:"",alamat:"Bekasi",proyek,items:[{jenis:"Epoxy Lantai",uraian:JENIS["Epoxy Lantai"],skema:SKEMA[0],luas:"250",harga:String(hrg)}],discType:"rp",discVal:"0",ppnOn:false,ppnPct:"11",syarat:st.syarat,ttdNama:"Nama Penandatangan",ttdJabatan:"Jabatan",nomorManual:true}});
   return [mk("d1","001/PNW/MM/XI/2026","001/PNW/MM/XI/2026",0,"2026-11-10","PT Contoh Satu","Lantai gudang",150000,"Terkirim"),mk("d2","001/PNW/MM/XI/2026-Rev1","001/PNW/MM/XI/2026",1,"2026-11-14","PT Contoh Satu","Lantai gudang",135000,"Draft")]})();
-let demoSig=null;
+let demoSig=null,demoProf={nama:"",jabatan:""};
 async function api(action,payload){
   if(DEMO){
     await new Promise(r=>setTimeout(r,250));
@@ -693,6 +693,8 @@ async function api(action,payload){
       return {ok:true,id:row.id};
     }
     if(action==="setStatus"){const r=demoDB.find(x=>x.id===p.id);if(r)r.status=p.status;return {ok:true}}
+    if(action==="getProfile") return {ok:true,nama:demoProf.nama,jabatan:demoProf.jabatan,dataUrl:demoSig};
+    if(action==="saveProfile"){demoProf={nama:p.nama,jabatan:p.jabatan};return {ok:true}}
     if(action==="getSig") return {ok:true,dataUrl:demoSig};
     if(action==="saveSig"){demoSig=p.dataUrl;return {ok:true}}
     if(action==="delSig"){demoSig=null;return {ok:true}}
@@ -748,6 +750,12 @@ async function doSave(asRev){
     st.id=r.id; saveInfo(); await refreshHist(); say(asRev?"Revisi tersimpan: "+st.nomor:"Tersimpan: "+st.nomor,4000);
   }finally{btn.disabled=false}
 }
+let profT=null;
+function saveProfileSoon(){
+  if(!API_ON) return; clearTimeout(profT);
+  profT=setTimeout(()=>{ST0.ttdNama=st.ttdNama;ST0.ttdJabatan=st.ttdJabatan;api("saveProfile",{nama:st.ttdNama,jabatan:st.ttdJabatan})},900);
+}
+["ttd-nama","ttd-jabatan"].forEach(id=>$(id).addEventListener("input",saveProfileSoon));
 $("btn-save").addEventListener("click",()=>doSave(false));
 $("btn-rev").addEventListener("click",()=>doSave(true));
 
@@ -797,7 +805,12 @@ async function enter(pw,keep){
   $("badge").hidden=true; $("navbtns").hidden=false;
   await refreshHist();
   if(!st.nomorManual){st.nomor=autoNomor();$("nomor").value=st.nomor;update()}
-  const s=await api("getSig"); if(s.ok&&s.dataUrl) setSig(s.dataUrl,false);
+  const s=await api("getProfile");
+  if(s.ok){
+    if(s.nama){st.ttdNama=s.nama;ST0.ttdNama=s.nama;$("ttd-nama").value=s.nama}
+    if(s.jabatan){st.ttdJabatan=s.jabatan;ST0.ttdJabatan=s.jabatan;$("ttd-jabatan").value=s.jabatan}
+    if(s.dataUrl) setSig(s.dataUrl,false); else update();
+  }
   showView("new"); saveInfo();
 }
 if(API_ON){
