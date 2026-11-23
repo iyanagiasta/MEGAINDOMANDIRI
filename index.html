@@ -163,6 +163,30 @@ input:focus,select:focus,textarea:focus,button:focus-visible,a:focus-visible{out
   body{padding-bottom:24px}
   #status{bottom:16px;left:auto;right:16px;max-width:420px}
 }
+
+/* efek klik */
+button,.btn,.tab,label.check,#login .pwrap button{-webkit-tap-highlight-color:transparent;transition:transform .12s ease,filter .15s ease,box-shadow .15s ease,background-color .15s ease,border-color .15s ease}
+.btn,.tab{position:relative;overflow:hidden;cursor:pointer;user-select:none}
+.btn:hover{filter:brightness(1.07)}
+.btn.ghost:hover,.tab:hover{background:#eef3fb;filter:none}
+.tab[aria-selected="true"]:hover{background:var(--navy)}
+.navbtns .btn:hover{background:rgba(255,255,255,.28);filter:none}
+.navbtns .btn.on:hover{background:#fff}
+.btn:active,.tab:active{transform:scale(.95);filter:brightness(.9)}
+#login .pwrap button:active{transform:translateY(-50%) scale(.92);opacity:.7}
+.btn:disabled{opacity:.65;cursor:progress;transform:none}
+label.check{cursor:pointer}
+label.check:active input{transform:scale(.85)}
+.check input{transition:transform .12s ease;cursor:pointer}
+.hrow,.sumc,.card{transition:box-shadow .2s ease,border-color .2s ease}
+.hrow:hover{box-shadow:0 6px 18px rgba(27,42,82,.10);border-color:#c7d2e6}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(31,95,168,.18)}
+:focus-visible{outline:3px solid rgba(31,95,168,.45);outline-offset:2px}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
+.ripple{position:absolute;border-radius:50%;background:rgba(255,255,255,.5);transform:scale(0);animation:rp .55s ease-out forwards;pointer-events:none}
+.btn.ghost .ripple,.tab .ripple,.navbtns .btn.on .ripple,.btn.danger .ripple{background:rgba(31,95,168,.22)}
+@keyframes rp{to{transform:scale(4);opacity:0}}
+@media (prefers-reduced-motion:reduce){.ripple{display:none}.btn:active,.tab:active{transform:none}}
 </style>
 </head>
 <body>
@@ -737,6 +761,14 @@ $("btn-pdf").addEventListener("click",async()=>{
 });
 
 renderItems(); layout(); update();
+/* efek klik: riak pada tombol dan tab */
+document.addEventListener("pointerdown",e=>{
+  const t=e.target.closest&&e.target.closest(".btn,.tab"); if(!t||t.disabled) return;
+  const r=t.getBoundingClientRect(), d=Math.max(r.width,r.height), sp=document.createElement("span");
+  sp.className="ripple"; sp.style.cssText="width:"+d+"px;height:"+d+"px;left:"+(e.clientX-r.left-d/2)+"px;top:"+(e.clientY-r.top-d/2)+"px";
+  t.appendChild(sp); setTimeout(()=>sp.remove(),600);
+},{passive:true});
+
 /* ---------- email ---------- */
 const emailOk=v=>/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(v).trim());
 $("btn-mailto").addEventListener("click",()=>{
