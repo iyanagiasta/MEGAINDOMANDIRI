@@ -392,6 +392,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none}
   <p class="hint" style="margin:0 0 12px">7 halaman company profile ditambahkan setelah surat penawaran dalam satu PDF.</p>
   <div class="actions">
     <button class="btn primary" id="btn-pdf" type="button">Unduh PDF</button>
+    <button class="btn ghost" id="btn-profile" type="button">Unduh Company Profile</button>
     <a class="btn navy" id="btn-wa" href="#" target="_blank" rel="noopener">Kirim WhatsApp</a>
   </div>
   <div class="card" style="margin-top:16px">
@@ -794,6 +795,17 @@ $("btn-pdf").addEventListener("click",async()=>{
     else{const u=URL.createObjectURL(blob),a2=document.createElement("a");a2.href=u;a2.download=name;document.body.appendChild(a2);a2.click();a2.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
     say(r.warn?"PDF penawaran siap, tetapi "+r.warn+".":(r.merged?"PDF siap diunduh, sudah termasuk company profile.":"PDF siap diunduh."),6000);
   }catch(e){say("PDF belum bisa disimpan: "+(e&&e.message?e.message:"dibatalkan"))}
+});
+
+$("btn-profile").addEventListener("click",async()=>{
+  try{
+    const bin=atob(PROFILE_B64), bytes=new Uint8Array(bin.length); for(let k=0;k<bin.length;k++) bytes[k]=bin.charCodeAt(k);
+    const blob=new Blob([bytes],{type:"application/pdf"}), name="Company-Profile-CV-Megaindo-Mandiri.pdf";
+    const dl=(typeof claude!=="undefined"&&claude.use)?await claude.use("downloads"):null;
+    if(dl){await dl.save({filename:name,data:blob})}
+    else{const u=URL.createObjectURL(blob),a2=document.createElement("a");a2.href=u;a2.download=name;document.body.appendChild(a2);a2.click();a2.remove();setTimeout(()=>URL.revokeObjectURL(u),4000)}
+    say("Company profile siap diunduh.",4000);
+  }catch(e){say("Company profile belum bisa disimpan: "+(e&&e.message?e.message:"dibatalkan"))}
 });
 
 renderItems(); layout(); update();
